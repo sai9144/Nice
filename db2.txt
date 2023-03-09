@@ -1,0 +1,30 @@
+# Prompt user to enter Windows username
+$username = Read-Host "Enter Windows username (format: DOMAIN\username)"
+
+# Generate SQL script
+$sqlScript = @"
+USE [master]
+GO
+
+CREATE LOGIN [$username] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]
+GO
+
+DECLARE @DBName VARCHAR(100)
+DECLARE @SQL VARCHAR(MAX)
+
+SET @SQL = ''
+SELECT @SQL = @SQL + 'USE [' + name + ']; ' +
+    'IF EXISTS(SELECT * FROM sys.sysusers WHERE name = ''NexidiaServicesUser'') ' +
+    'BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [$username], Name=[NexidiaServicesUser]; END; ' +
+    'ELSE BEGIN CREATE USER [NexidiaServicesUser] FOR LOGIN [$username]; END; '
+FROM sys.databases
+WHERE name IN ('ExportTracking', 'NexidiaESI', 'NexidiaESIDW', 'NexidiaEvaluations', 'NxDiscovery', 'NxMstrMetadata', 'NxDeployer', 'NxAutoDiscovery')
+
+EXEC (@SQL)
+"@
+
+# Save SQL script to file
+$outputFilePath = Join-Path $PSScriptRoot "grant-db-access.sql"
+$sqlScript | Out-File -FilePath $outputFilePath -Encoding utf8
+
+Write-Host "SQL script saved to $outputFilePath"

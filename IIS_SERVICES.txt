@@ -1,0 +1,58 @@
+# Prompt the user for the username and password
+$cred = Get-Credential -Message "Enter new username and password"
+
+# Define the list of servers
+$servers = Get-Content "C:\Scripts\Allservers.txt"
+
+# Define the list of services and the start sequence
+$services = @("NexidiaConfig","NexidiaBackgroundWorker","NexidiaDataCompliance","NexidiaDiscovery","NexidiaEvaluationsAging","NexidiaIngest","NexidiaReplay","NexidiaSearch","NxGridGateway","NxGridControl","NxGridBase","NxGridAgent")
+$startSequence = $services | Sort-Object
+
+# Loop through each server in the list
+foreach ($server in $servers) {
+    # Stop the NexidiaConfig service first, then the rest of the services sorted by name
+    foreach ($service in "NexidiaConfig", ($services | Sort-Object)) {
+        Invoke-Command -ComputerName $server -ScriptBlock {            
+            Get-Service -Name $using:service | Stop-Service -Force
+        }
+    }
+
+    # Change the service account and password for the services
+    foreach ($service in $services) {
+        Invoke-Command -ComputerName $server -ScriptBlock {
+            $serviceName = $using:service
+            $userName = $using:cred.UserName
+            $password = $using:cred.Password
+
+            # Change the service account and password
+            $act = sc.exe config $serviceName obj= $userName password= $password
+            if ($act) {
+                Write-Output "$Using:server Service Account Change Succeeded for $serviceName"
+            } else {
+                Write-Output "$Using:server Service Account Change Failed for $serviceName"
+            }
+        }
+    }
+
+    # Start the services in the specified order
+    foreach ($service in $startSequence) {
+        Invoke-Command -ComputerName $server -ScriptBlock {
+            Get-Service -Name $using:service | Start-Service
+        }
+    }
+
+    # Loop through each App Pool name
+    foreach ($appPoolName in @("MicroStrategyWebPool", "NxIAAgentObserverAppPool", "NxIAAutoDiscoveryAppPool", "NxIAAutoDiscoveryProxyAppPool", "NxIADiscoveryAppPool", "NxIAEvaluationsAppPool", "NxIAEvaluationScorecardsAppPool", "NxIAEvaluationsPortalAppPool", "NxIAKnowledgeBaseAppPool", "NxIAMainAppPool", "NxIAPortalAppPool", "NxIARestApiAppPool", "NxIARootAppPool", "NxIASearchAppPool", "NxIAWebServicesAppPool")) {
+        # Get current App Pool user identity
+        $appPool = Get-WebAppPoolState -Name $appPoolName
+        $currentUsername = $appPool.processModel.userName
+
+        # If current username is not the same as the new username, update it
+        if ($currentUsername -ne $cred.UserName) {
+            Set-WebConfigurationProperty "/system.applicationHost/applicationPools/add[@name='$appPoolName']/processModel" -Name "userName" -Value $cred.UserName -PSPath "IIS:\"
+            Set-WebConfigurationProperty "/system.applicationHost/applicationPools/add[@name='$appPoolName']/processModel" -Name "password" -Value $cred.Password -PSPath "IIS:\"
+
+            Write-Host "Updated App Pool '$appPoolName' to use user '$($cred.UserName)'." -ForegroundColor Green
+        }
+    }
+}

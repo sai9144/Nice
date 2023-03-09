@@ -1,0 +1,46 @@
+USE [master]
+GO
+
+/****** Object:  Login [NIATOOL\nxservice]    Script Date: 3/7/2023 8:04:13 PM ******/
+CREATE LOGIN [NIATOOL\nxservice2] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]
+GO
+================
+DECLARE @DBName VARCHAR(100)
+DECLARE @SQL VARCHAR(MAX)
+
+SET @SQL = ''
+SELECT @SQL = @SQL + 'USE [' + name + ']; ' +
+    'IF EXISTS(SELECT * FROM sys.sysusers WHERE name = ''NexidiaServicesUser'') ' +
+    'BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice2], Name=[NexidiaServicesUser]; END; '
+FROM sys.databases
+WHERE name IN ('ExportTracking', 'NexidiaESI', 'NexidiaESIDW', 'NexidiaEvaluations', 'NxDiscovery', 'NxMstrMetadata', 'NxDeployer', 'NxAutoDiscovery')
+
+EXEC (@SQL)
+
+
+===================
+#############Dont Use Below Testing is Pending##############
+USE [ExportTracking]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser')
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END;
+
+ USE [NexidiaESI]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser') 
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END; 
+
+USE [NexidiaESIDW]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser') 
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END; 
+
+USE [NexidiaEvaluations]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser') 
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END;
+
+ USE [NxAutoDiscovery]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser') 
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END; 
+
+USE [NxDeployer]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser')
+ BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END; 
+
+USE [NxDiscovery]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser') 
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END; 
+
+USE [NxMstrMetadata]; IF EXISTS(SELECT * FROM sys.sysusers WHERE name = 'NexidiaServicesUser') 
+BEGIN ALTER USER [NexidiaServicesUser] WITH LOGIN = [NIATOOL\nxservice], Name=[NexidiaServicesUser]; END;
+
