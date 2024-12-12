@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Directory containing the received files
+SOURCE_DIR="/path/to/source/files"
+
+# Arrays to store successful and unsuccessful operations
+success_files=()
+failed_files=()
+skipped_files=()
+
+# Process each file in the source directory
+for file in "$SOURCE_DIR"/*; do
+    # Extract the header path
+    header_line=$(grep "^# \$Header" "$file" | head -n 1 2>/dev/null)
+    
+    if [[ -z $header_line ]]; then
+        echo "No header found in file $file, skipping..."
+        failed_files+=("$file (No header found)")
+        continue
+    fi
+    
+    # Extract the directory and target filename from the header
+    header_path=$(echo "$header_line" | sed 's/^# \$Header: //')
+    target_dir=$(dirname "$header_path")
+    target_file=$(basename "$header_path")
+    target_path="$target_dir/$target_file"
+    
+    # Check if the directory exists
+    if [[ ! -d $target_dir ]]; then
+        read -p "Directory $target_dir does not exist. Create it? (y/n): " create_dir
+        if [[ $create_dir == "y" ]]; then
+            if mkdir -p "$target_dir"; then
+                echo "Directory $target_dir created."
+            else
+                echo "Failed to create directory $target_dir. Skipping $file."
+                failed_files+=("$file (Directory creation failed)")
+                continue
+            fi
+        else
+            echo "Skipping $file as directory $target_dir does not exist."
+            failed_files+=("$file (Directory not created)")
+            continue
+        fi
+    fi
+    
+    # Check if a file with the target name already exists
+    if [[ -f "$target_path" ]]; then
+        # Compare hashes to see if the new file differs from the existing one
+        existing_hash=$(md5sum "$target_path" | awk '{print $1}')
+        new_file_hash=$(md5sum "$file" | awk '{print $1}')
+        
+        if [[ $existing_hash == $new_file_hash ]]; then
+            echo "File $file is identical to $target_path, skipping copy."
+            skipped_files+=("$file (Identical to existing)")
+            continue
+        else
+            # Backup the existing file with a timestamp
+            backup_file="${target_dir}/${target_file}_$(date +%Y%m%d_%H%M%S)"
+            if mv "$target_path" "$backup_file"; then
+                echo "Backup of existing file created as $backup_file."
+            else
+                echo "Failed to create backup for $target_path. Skipping $file."
+                failed_files+=("$file (Backup creation failed)")
+                continue
+            fi
+        fi
+    fi
+    
+    # Copy the file to the target directory
+    if cp "$file" "$target_path"; then
+        echo "$file copied to $target_path."
+        success_files+=("$file")
+    else
+        echo "Failed to copy $file to $target_path."
+        failed_files+=("$file (Copy failed)")
+    fi
+done
+
+# Display summary
+echo -e "\nSummary:"
+echo "Successful copies:"
+for success in "${success_files[@]}"; do
+    echo "- $success"
+done
+
+echo -e "\nSkipped copies (No changes detected):"
+for skip in "${skipped_files[@]}"; do
+    echo "- $skip"
+done
+
+echo -e "\nFailed copies:"
+for fail in "${failed_files[@]}"; do
+    echo "- $fail"
+done
